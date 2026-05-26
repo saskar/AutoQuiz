@@ -291,11 +291,14 @@ export function QuizEditor({
 
 const SUBJECT_PRESETS = [
   { group: "English", options: ["English — Reading Comprehension", "English — Grammar & Punctuation", "English — Literature", "English — Writing & Composition", "English — Vocabulary"] },
-  { group: "Mathematics", options: ["Mathematics — Algebra", "Mathematics — Geometry", "Mathematics — Calculus", "Mathematics — Statistics", "Mathematics — Arithmetic & Number Theory"] },
-  { group: "Science", options: ["Science — Biology", "Science — Chemistry", "Science — Physics", "Science — Earth Science", "Science — Environmental Science"] },
-  { group: "History & Social Studies", options: ["History — World History", "History — Ancient Civilizations", "Geography", "Economics", "Civics & Government"] },
-  { group: "Technology", options: ["Computer Science — Programming", "Computer Science — Data Structures", "Information Technology", "Cybersecurity", "Data Science & AI"] },
-  { group: "Languages", options: ["Arabic Language", "French Language", "Spanish Language", "German Language", "Chinese Language"] },
+  { group: "Arabic Language", options: ["Arabic — Reading Comprehension (الفهم القرائي)", "Arabic — Grammar & Morphology (النحو والصرف)", "Arabic — Writing & Composition (الإنشاء والكتابة)", "Arabic — Vocabulary & Expressions (المفردات والتعابير)", "Arabic — Literature & Poetry (الأدب والشعر)", "Arabic — Spelling & Dictation (الإملاء)", "Arabic — Oral Expression (التعبير الشفوي)"] },
+  { group: "Islamic Studies", options: ["Islamic Studies — Quran & Tajweed (القرآن الكريم والتجويد)", "Islamic Studies — Hadith & Sunnah (الحديث النبوي)", "Islamic Studies — Aqeedah / Islamic Beliefs (العقيدة)", "Islamic Studies — Fiqh & Islamic Jurisprudence (الفقه الإسلامي)", "Islamic Studies — Seerah / Prophet's Biography (السيرة النبوية)", "Islamic Studies — Islamic History & Civilization (التاريخ الإسلامي)", "Islamic Studies — Islamic Morals & Ethics (الأخلاق الإسلامية)", "Islamic Studies — Pillars of Islam & Iman (أركان الإسلام والإيمان)"] },
+  { group: "Civics & Social Studies", options: ["Civics — Rights & Responsibilities of Citizens", "Civics — Government & Political Systems", "Civics — The Constitution & Law", "Civics — Local, National & Global Governance", "Civics — Democracy & Elections", "Social Studies — Community & Society", "Social Studies — Human Rights & Justice"] },
+  { group: "Mathematics", options: ["Mathematics — Algebra", "Mathematics — Geometry", "Mathematics — Calculus", "Mathematics — Statistics", "Mathematics — Arithmetic & Number Theory", "Mathematics — Trigonometry", "Mathematics — Probability"] },
+  { group: "Science", options: ["Science — Biology", "Science — Chemistry", "Science — Physics", "Science — Earth Science", "Science — Environmental Science", "Science — Anatomy & Human Body", "Science — Space & Astronomy"] },
+  { group: "History & Geography", options: ["History — World History", "History — Ancient Civilizations", "History — Middle Eastern History", "History — Islamic Golden Age", "Geography — Physical Geography", "Geography — Human & Cultural Geography", "Economics & Financial Literacy"] },
+  { group: "Technology", options: ["Computer Science — Programming", "Computer Science — Data Structures", "Information Technology", "Cybersecurity", "Data Science & AI", "Robotics & Engineering"] },
+  { group: "Other Languages", options: ["French Language", "Spanish Language", "German Language", "Chinese Language"] },
   { group: "Arts & Music", options: ["Art History", "Music Theory", "Visual Arts", "Drama & Theatre"] },
 ]
 
