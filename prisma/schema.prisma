@@ -58,6 +58,9 @@ model Quiz {
   title        String
   description  String?
   examType     String       @default("QUIZ")
+  mode         String       @default("QUIZ")
+  passingScore Int?
+  closeAt      DateTime?
   timeLimit    Int?
   published    Boolean      @default(false)
   createdAt    DateTime     @default(now())
