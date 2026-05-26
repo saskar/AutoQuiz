@@ -287,9 +287,28 @@ export function QuizEditor({
   )
 }
 
-// ─── AI Generator Panel ──────────────────────────────────────────────────────
+// ─── AI Generator Modal ──────────────────────────────────────────────────────
 
-const DIFFICULTIES = ["easy", "medium", "hard"]
+const SUBJECT_PRESETS = [
+  { group: "English", options: ["English — Reading Comprehension", "English — Grammar & Punctuation", "English — Literature", "English — Writing & Composition", "English — Vocabulary"] },
+  { group: "Mathematics", options: ["Mathematics — Algebra", "Mathematics — Geometry", "Mathematics — Calculus", "Mathematics — Statistics", "Mathematics — Arithmetic & Number Theory"] },
+  { group: "Science", options: ["Science — Biology", "Science — Chemistry", "Science — Physics", "Science — Earth Science", "Science — Environmental Science"] },
+  { group: "History & Social Studies", options: ["History — World History", "History — Ancient Civilizations", "Geography", "Economics", "Civics & Government"] },
+  { group: "Technology", options: ["Computer Science — Programming", "Computer Science — Data Structures", "Information Technology", "Cybersecurity", "Data Science & AI"] },
+  { group: "Languages", options: ["Arabic Language", "French Language", "Spanish Language", "German Language", "Chinese Language"] },
+  { group: "Arts & Music", options: ["Art History", "Music Theory", "Visual Arts", "Drama & Theatre"] },
+]
+
+const DIFFICULTY_OPTIONS = [
+  { value: "beginner", label: "Beginner" },
+  { value: "easy", label: "Easy" },
+  { value: "medium", label: "Medium" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "hard", label: "Hard" },
+  { value: "advanced", label: "Advanced" },
+  { value: "expert", label: "Expert" },
+]
+
 const GRADE_LEVELS = [
   "Elementary (K-5)",
   "Middle School (6-8)",
@@ -299,7 +318,6 @@ const GRADE_LEVELS = [
   "Professional",
   "General",
 ]
-const Q_COUNTS = [5, 10, 15, 20, 25, 30, 40, 50]
 
 interface AIGeneratorPanelProps {
   examType: string
@@ -309,9 +327,9 @@ interface AIGeneratorPanelProps {
 }
 
 function AIGeneratorPanel({ examType, currentCount, onAdd, onClose }: AIGeneratorPanelProps) {
-  const [topic, setTopic] = useState("")
-  const [subject, setSubject] = useState("")
-  const [count, setCount] = useState(10)
+  const [selectedSubject, setSelectedSubject] = useState("custom")
+  const [customTopic, setCustomTopic] = useState("")
+  const [countStr, setCountStr] = useState("10")
   const [difficulty, setDifficulty] = useState("medium")
   const [gradeLevel, setGradeLevel] = useState("High School (9-12)")
   const [questionTypes, setQuestionTypes] = useState("mixed")
@@ -319,8 +337,13 @@ function AIGeneratorPanel({ examType, currentCount, onAdd, onClose }: AIGenerato
   const [genError, setGenError] = useState("")
   const [preview, setPreview] = useState<QuestionForm[] | null>(null)
 
+  const allSubjects = ["custom", ...SUBJECT_PRESETS.flatMap((g) => g.options)]
+  const topic = selectedSubject === "custom" ? customTopic : selectedSubject
+  const count = Math.min(Math.max(parseInt(countStr) || 10, 1), 100)
+
   const generate = async () => {
-    if (!topic.trim()) { setGenError("Enter a topic first"); return }
+    if (!topic.trim()) { setGenError("Choose a subject or enter a custom topic"); return }
+    if (!countStr || count < 1) { setGenError("Enter a valid number of questions (1–100)"); return }
     setGenerating(true)
     setGenError("")
     setPreview(null)
@@ -329,7 +352,7 @@ function AIGeneratorPanel({ examType, currentCount, onAdd, onClose }: AIGenerato
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, subject, examType, questionCount: count, difficulty, gradeLevel, questionTypes }),
+        body: JSON.stringify({ topic, examType, questionCount: count, difficulty, gradeLevel, questionTypes }),
       })
       const json = await res.json()
       if (!res.ok) { setGenError(json.error || "Generation failed"); return }
@@ -342,181 +365,247 @@ function AIGeneratorPanel({ examType, currentCount, onAdd, onClose }: AIGenerato
   }
 
   return (
-    <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-indigo-200 rounded-xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">✨</span>
-          <h3 className="font-semibold text-gray-800">AI Question Generator</h3>
-          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
-            Powered by Claude
-          </span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal header */}
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 rounded-t-2xl flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-lg">✨</span>
+              <h3 className="font-bold text-gray-900">AI Question Generator</h3>
+              <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">Claude</span>
+            </div>
+            <p className="text-xs text-gray-500">Choose a subject and settings — AI will write the questions.</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 ml-4 flex-shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
 
-      {!preview ? (
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Topic / Subject Matter <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="e.g. The French Revolution, Quadratic Equations, Photosynthesis"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                onKeyDown={(e) => e.key === "Enter" && generate()}
-              />
-            </div>
+        {!preview ? (
+          <div className="p-6 space-y-4">
+            {/* Subject selector */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Course / Subject (optional)</label>
-              <input
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="e.g. AP Chemistry, 8th Grade Math"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Grade / Level</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
               <select
-                value={gradeLevel}
-                onChange={(e) => setGradeLevel(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
-                {GRADE_LEVELS.map((g) => <option key={g}>{g}</option>)}
+                <option value="custom">✏️ Custom topic (type below)</option>
+                {SUBJECT_PRESETS.map((group) => (
+                  <optgroup key={group.group} label={group.group}>
+                    {group.options.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
+              {selectedSubject === "custom" && (
+                <input
+                  type="text"
+                  value={customTopic}
+                  onChange={(e) => setCustomTopic(e.target.value)}
+                  placeholder="e.g. The French Revolution, Photosynthesis, Python loops…"
+                  className="mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  onKeyDown={(e) => e.key === "Enter" && generate()}
+                  autoFocus
+                />
+              )}
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Number of Questions</label>
-              <select
-                value={count}
-                onChange={(e) => setCount(Number(e.target.value))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-              >
-                {Q_COUNTS.map((n) => <option key={n}>{n}</option>)}
-              </select>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* Custom question count */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Questions
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={countStr}
+                    onChange={(e) => setCountStr(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center font-semibold"
+                  />
+                </div>
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {[5, 10, 15, 20, 25, 30].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setCountStr(String(n))}
+                      className={`text-xs px-2 py-0.5 rounded-md border transition-colors ${
+                        countStr === String(n)
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "border-gray-200 text-gray-500 hover:border-indigo-300"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Grade level */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Grade / Level</label>
+                <select
+                  value={gradeLevel}
+                  onChange={(e) => setGradeLevel(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                >
+                  {GRADE_LEVELS.map((g) => <option key={g}>{g}</option>)}
+                </select>
+              </div>
             </div>
+
+            {/* Difficulty */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Difficulty</label>
-              <div className="flex gap-2">
-                {DIFFICULTIES.map((d) => (
+              <label className="block text-sm font-medium text-gray-700 mb-2">Difficulty Level</label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {DIFFICULTY_OPTIONS.map((d) => (
                   <button
-                    key={d}
+                    key={d.value}
                     type="button"
-                    onClick={() => setDifficulty(d)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-colors ${
-                      difficulty === d
+                    onClick={() => setDifficulty(d.value)}
+                    className={`py-2 rounded-lg text-xs font-medium transition-colors ${
+                      difficulty === d.value
                         ? "bg-indigo-600 text-white"
-                        : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
-                    {d}
+                    {d.label}
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* Question types */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Question Types</label>
-              <div className="flex gap-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Question Format</label>
+              <div className="grid grid-cols-3 gap-2">
                 {[
-                  { value: "mixed", label: "Mixed" },
-                  { value: "MULTIPLE_CHOICE", label: "MC Only" },
-                  { value: "SHORT_ANSWER", label: "SA Only" },
+                  { value: "mixed", label: "Mixed", desc: "All types" },
+                  { value: "MULTIPLE_CHOICE", label: "MC Only", desc: "Multiple choice" },
+                  { value: "SHORT_ANSWER", label: "SA Only", desc: "Short answer" },
                 ].map((t) => (
                   <button
                     key={t.value}
                     type="button"
                     onClick={() => setQuestionTypes(t.value)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    className={`py-2.5 px-3 rounded-lg text-xs font-medium transition-colors border text-left ${
                       questionTypes === t.value
-                        ? "bg-indigo-600 text-white"
-                        : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-indigo-300"
                     }`}
                   >
-                    {t.label}
+                    <div>{t.label}</div>
+                    <div className={`text-xs mt-0.5 ${questionTypes === t.value ? "text-indigo-200" : "text-gray-400"}`}>{t.desc}</div>
                   </button>
                 ))}
               </div>
             </div>
-          </div>
 
-          {genError && (
-            <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{genError}</p>
-          )}
+            {/* Feature bullets */}
+            <div className="bg-indigo-50 rounded-xl p-3 space-y-1">
+              {[
+                `Generates ${count} ${difficulty} question${count !== 1 ? "s" : ""} on "${topic || "your topic"}"`,
+                "All questions are reviewed before adding",
+                "You can add to existing or replace all questions",
+              ].map((b) => (
+                <p key={b} className="text-xs text-indigo-700 flex items-start gap-1.5">
+                  <span className="mt-0.5">✦</span> {b}
+                </p>
+              ))}
+            </div>
 
-          <button
-            type="button"
-            onClick={generate}
-            disabled={generating || !topic.trim()}
-            className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-          >
-            {generating ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Generating {count} questions…
-              </>
-            ) : (
-              <>✨ Generate {count} Questions</>
+            {genError && (
+              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{genError}</p>
             )}
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">
-              Generated {preview.length} questions — review and add them:
-            </p>
+
             <button
               type="button"
-              onClick={() => setPreview(null)}
-              className="text-xs text-gray-500 hover:text-gray-700"
+              onClick={generate}
+              disabled={generating || !topic.trim()}
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
             >
-              ← Back
+              {generating ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  Generating {count} questions…
+                </>
+              ) : (
+                <>✨ Generate {count} Questions</>
+              )}
             </button>
           </div>
-
-          <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
-            {preview.map((q, i) => (
-              <div key={i} className="bg-white rounded-lg border border-gray-200 px-4 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-xs font-medium text-gray-800 flex-1">{i + 1}. {q.text}</p>
-                  <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
-                    {q.type === "MULTIPLE_CHOICE" ? "MC" : "SA"}
-                  </span>
-                </div>
-                <p className="text-xs text-green-600 mt-1">✓ {q.answer}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            {currentCount > 0 && (
+        ) : (
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-800">
+                {preview.length} questions generated — review before adding:
+              </p>
               <button
                 type="button"
-                onClick={() => onAdd(preview, false)}
-                className="flex-1 py-2.5 border border-indigo-300 text-indigo-700 rounded-xl text-sm font-medium hover:bg-indigo-50 transition-colors"
+                onClick={() => setPreview(null)}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
               >
-                + Add to existing ({currentCount + preview.length} total)
+                ← Change settings
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => onAdd(preview, true)}
-              className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
-            >
-              {currentCount > 0 ? "Replace all questions" : "Use these questions"}
-            </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+              {preview.map((q, i) => (
+                <div key={i} className="bg-gray-50 rounded-xl border border-gray-200 px-4 py-3">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="text-sm font-medium text-gray-800 flex-1">{i + 1}. {q.text}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${
+                      q.type === "MULTIPLE_CHOICE" ? "bg-blue-100 text-blue-600" : "bg-purple-100 text-purple-600"
+                    }`}>
+                      {q.type === "MULTIPLE_CHOICE" ? "MC" : "SA"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-green-600">✓ {q.answer}</p>
+                  {q.type === "MULTIPLE_CHOICE" && q.options.filter(Boolean).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {q.options.filter(Boolean).map((o, oi) => (
+                        <span key={oi} className={`text-xs px-2 py-0.5 rounded-md ${o === q.answer ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>{o}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2 sticky bottom-0 bg-white pt-2">
+              {currentCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onAdd(preview, false)}
+                  className="flex-1 py-2.5 border border-indigo-300 text-indigo-700 rounded-xl text-sm font-semibold hover:bg-indigo-50 transition-colors"
+                >
+                  + Add ({currentCount + preview.length} total)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onAdd(preview, true)}
+                className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors"
+              >
+                {currentCount > 0 ? "Replace all" : "Use these questions"}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
