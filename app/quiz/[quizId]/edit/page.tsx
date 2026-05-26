@@ -11,6 +11,9 @@ interface QuizData {
   title: string
   description: string | null
   examType: string
+  mode: string
+  passingScore: number | null
+  closeAt: string | null
   timeLimit: number | null
   published: boolean
   questions: Array<{
@@ -91,8 +94,8 @@ export default function EditQuizPage({ params }: { params: { quizId: string } })
     .sort((a, b) => a.order - b.order)
     .map((q) => ({
       text: q.text,
-      type: q.type as "MULTIPLE_CHOICE" | "SHORT_ANSWER",
-      options: q.options ? JSON.parse(q.options) : ["", "", "", ""],
+      type: q.type as "MULTIPLE_CHOICE" | "SHORT_ANSWER" | "SURVEY" | "TRUE_FALSE" | "FILL_BLANK",
+      options: q.options ? JSON.parse(q.options) : (q.type === "TRUE_FALSE" ? ["True", "False"] : []),
       answer: q.answer,
       points: q.points,
     }))
@@ -107,7 +110,9 @@ export default function EditQuizPage({ params }: { params: { quizId: string } })
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">Edit Quiz</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Edit {quiz.mode === "EXAM" ? "Exam" : "Quiz"}
+            </h1>
             <span
               className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                 quiz.published ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
@@ -129,7 +134,7 @@ export default function EditQuizPage({ params }: { params: { quizId: string } })
 
       {saved && (
         <div className="mb-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700">
-          Quiz saved successfully!
+          Saved successfully!
         </div>
       )}
 
@@ -137,7 +142,11 @@ export default function EditQuizPage({ params }: { params: { quizId: string } })
         initialTitle={quiz.title}
         initialDescription={quiz.description ?? ""}
         initialExamType={quiz.examType}
+        initialMode={quiz.mode}
+        initialPassingScore={quiz.passingScore}
+        initialCloseAt={quiz.closeAt}
         initialTimeLimit={quiz.timeLimit}
+        initialPublished={quiz.published}
         initialQuestions={initialQuestions}
         onSave={handleSave}
         saving={saving}

@@ -21,6 +21,9 @@ interface Quiz {
   title: string
   description: string | null
   examType: string
+  mode: string
+  passingScore: number | null
+  closeAt: string | null
   timeLimit: number | null
   questions: Question[]
   instructor: { name: string | null }
@@ -36,6 +39,7 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
   const [alreadySubmitted, setAlreadySubmitted] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
+  const [closed, setClosed] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -82,6 +86,10 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
       })
       .then((data) => {
         setQuiz(data)
+        // Check if already closed
+        if (data.closeAt && new Date() > new Date(data.closeAt)) {
+          setClosed(true)
+        }
         if (data.timeLimit) {
           const secs = data.timeLimit * 60
           setSecondsLeft(secs)
@@ -110,6 +118,19 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
     )
   }
 
+  if (closed) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <div className="text-4xl mb-4">🔒</div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Quiz Closed</h2>
+        <p className="text-gray-500 text-sm mb-6">This quiz is no longer accepting submissions.</p>
+        <Link href="/browse" className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700">
+          Browse other quizzes
+        </Link>
+      </div>
+    )
+  }
+
   if (alreadySubmitted) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
@@ -132,6 +153,7 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
   const total = quiz.questions.length
   const totalPoints = quiz.questions.reduce((s, q) => s + q.points, 0)
   const examMeta = EXAM_TYPES.find((e) => e.value === quiz.examType)
+  const isExam = quiz.mode === "EXAM"
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60).toString().padStart(2, "0")
@@ -167,6 +189,11 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
               {examMeta.emoji} {examMeta.label}
             </span>
           )}
+          {isExam && (
+            <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">
+              Exam · Pass: {quiz.passingScore ?? 60}%
+            </span>
+          )}
         </div>
         <h1 className="text-2xl font-bold text-gray-900">{quiz.title}</h1>
         {quiz.description && <p className="text-gray-500 text-sm mt-1">{quiz.description}</p>}
@@ -198,6 +225,8 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
           const options: string[] = question.options ? JSON.parse(question.options) : []
           const isAnswered = !!answers[question.id]?.trim()
           const isSurvey = question.type === "SURVEY"
+          const isTrueFalse = question.type === "TRUE_FALSE"
+          const isFillBlank = question.type === "FILL_BLANK"
 
           // Build survey options based on the answer format marker
           const surveyFormat = question.answer || "text"
@@ -224,6 +253,12 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
                   <div>
                     {isSurvey && (
                       <span className="text-xs text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded font-medium mr-2">Opinion</span>
+                    )}
+                    {isTrueFalse && (
+                      <span className="text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium mr-2">True/False</span>
+                    )}
+                    {isFillBlank && (
+                      <span className="text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded font-medium mr-2">Fill in the Blank</span>
                     )}
                     <span className="text-sm font-medium text-gray-800">{question.text}</span>
                   </div>
@@ -254,6 +289,29 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
                     </label>
                   ))}
                 </div>
+              ) : isTrueFalse ? (
+                <div className="flex gap-3 ml-8">
+                  {["True", "False"].map((opt) => (
+                    <label
+                      key={opt}
+                      className={`flex items-center gap-2 px-5 py-3 rounded-lg cursor-pointer border transition-colors ${
+                        answers[question.id] === opt
+                          ? "border-emerald-400 bg-emerald-50"
+                          : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`q-${question.id}`}
+                        value={opt}
+                        checked={answers[question.id] === opt}
+                        onChange={() => setAnswers((a) => ({ ...a, [question.id]: opt }))}
+                        className="text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">{opt}</span>
+                    </label>
+                  ))}
+                </div>
               ) : question.type === "SURVEY" && surveyOptions.length > 0 ? (
                 <div className="space-y-2 ml-8">
                   {surveyOptions.map((option, i) => (
@@ -279,14 +337,21 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
                 </div>
               ) : (
                 <div className="ml-8">
+                  {isFillBlank && (
+                    <p className="text-xs text-orange-600 mb-2">
+                      Fill in the blank: {question.text.includes("___") ? "answer the missing word" : "provide the answer"}
+                    </p>
+                  )}
                   <input
                     type="text"
                     value={answers[question.id] ?? ""}
                     onChange={(e) => setAnswers((a) => ({ ...a, [question.id]: e.target.value }))}
-                    placeholder={isSurvey ? "Share your thoughts…" : "Your answer…"}
+                    placeholder={isSurvey ? "Share your thoughts…" : isFillBlank ? "Your answer for the blank…" : "Your answer…"}
                     className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
                       isSurvey
                         ? "border-teal-200 focus:ring-teal-400"
+                        : isFillBlank
+                        ? "border-orange-200 focus:ring-orange-400"
                         : "border-gray-300 focus:ring-indigo-500"
                     }`}
                   />
@@ -310,7 +375,7 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
           disabled={submitting}
           className="bg-indigo-600 text-white px-8 py-3 rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
         >
-          {submitting ? "Submitting…" : "Submit Quiz"}
+          {submitting ? "Submitting…" : isExam ? "Submit Exam" : "Submit Quiz"}
         </button>
       </div>
     </div>

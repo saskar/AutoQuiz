@@ -28,7 +28,7 @@ interface Submission {
   earnedPoints: number
   totalPoints: number
   submittedAt: string
-  quiz: { id: string; title: string }
+  quiz: { id: string; title: string; mode: string; passingScore: number | null }
   student: { name: string | null; image: string | null }
   answers: Answer[]
 }
@@ -95,11 +95,38 @@ export default function ResultPage({ params }: { params: { quizId: string } }) {
   const sorted = [...submission.answers].sort((a, b) => a.question.order - b.question.order)
   const correct = sorted.filter((a) => a.isCorrect).length
 
+  const isExam = submission.quiz.mode === "EXAM"
+  const passingScore = submission.quiz.passingScore ?? 60
+  const passed = isExam ? submission.score >= passingScore : null
+
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
       <Link href="/dashboard" className="text-sm text-gray-400 hover:text-gray-600 mb-6 inline-block">
         ← Dashboard
       </Link>
+
+      {/* Pass/Fail banner for EXAM mode */}
+      {isExam && passed !== null && (
+        <div
+          className={`mb-4 rounded-xl px-5 py-4 flex items-center gap-3 ${
+            passed
+              ? "bg-green-50 border border-green-200"
+              : "bg-red-50 border border-red-200"
+          }`}
+        >
+          <span className="text-2xl">{passed ? "✓" : "✗"}</span>
+          <div>
+            <p className={`font-bold text-lg ${passed ? "text-green-700" : "text-red-700"}`}>
+              {passed ? "PASSED" : "FAILED"}
+            </p>
+            <p className={`text-sm ${passed ? "text-green-600" : "text-red-600"}`}>
+              {passed
+                ? `You scored ${Math.round(submission.score)}% — above the ${passingScore}% passing threshold.`
+                : `You scored ${Math.round(submission.score)}% — below the ${passingScore}% passing threshold.`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Score summary */}
       <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm mb-6 text-center">
@@ -124,81 +151,89 @@ export default function ResultPage({ params }: { params: { quizId: string } }) {
         </div>
       </div>
 
-      {/* Per-question feedback */}
-      <div className="space-y-4">
-        <h2 className="text-base font-semibold text-gray-800">Question Breakdown</h2>
-        {sorted.map((answer, index) => {
-          const options: string[] = answer.question.options
-            ? JSON.parse(answer.question.options)
-            : []
+      {/* Per-question feedback — hide for EXAM mode */}
+      {!isExam && (
+        <div className="space-y-4">
+          <h2 className="text-base font-semibold text-gray-800">Question Breakdown</h2>
+          {sorted.map((answer, index) => {
+            const options: string[] = answer.question.options
+              ? JSON.parse(answer.question.options)
+              : []
 
-          const isSurvey = answer.question.type === "SURVEY"
-          return (
-            <div
-              key={answer.id}
-              className={`bg-white rounded-xl border p-5 shadow-sm ${
-                isSurvey
-                  ? "border-teal-200"
-                  : answer.isCorrect
-                  ? "border-green-200"
-                  : "border-red-200"
-              }`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-start gap-2">
-                  <span
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5 ${
-                      isSurvey
-                        ? "bg-teal-100 text-teal-700"
-                        : answer.isCorrect
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {isSurvey ? "•" : answer.isCorrect ? "✓" : "✗"}
-                  </span>
-                  <div>
-                    {isSurvey && (
-                      <span className="text-xs text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded font-medium mr-2">Opinion</span>
-                    )}
-                    <span className="text-sm font-medium text-gray-800">{answer.question.text}</span>
+            const isSurvey = answer.question.type === "SURVEY"
+            return (
+              <div
+                key={answer.id}
+                className={`bg-white rounded-xl border p-5 shadow-sm ${
+                  isSurvey
+                    ? "border-teal-200"
+                    : answer.isCorrect
+                    ? "border-green-200"
+                    : "border-red-200"
+                }`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-start gap-2">
+                    <span
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5 ${
+                        isSurvey
+                          ? "bg-teal-100 text-teal-700"
+                          : answer.isCorrect
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {isSurvey ? "•" : answer.isCorrect ? "✓" : "✗"}
+                    </span>
+                    <div>
+                      {isSurvey && (
+                        <span className="text-xs text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded font-medium mr-2">Opinion</span>
+                      )}
+                      <span className="text-sm font-medium text-gray-800">{answer.question.text}</span>
+                    </div>
                   </div>
+                  <span className="text-xs font-medium flex-shrink-0 ml-3">
+                    {isSurvey ? "Recorded" : `${answer.pointsEarned}/${answer.question.points}pt${answer.question.points !== 1 ? "s" : ""}`}
+                  </span>
                 </div>
-                <span className="text-xs font-medium flex-shrink-0 ml-3">
-                  {isSurvey ? "Recorded" : `${answer.pointsEarned}/${answer.question.points}pt${answer.question.points !== 1 ? "s" : ""}`}
-                </span>
-              </div>
 
-              <div className="ml-7 space-y-1 text-sm">
-                <div className="flex gap-2">
-                  <span className="text-gray-400 text-xs w-20 flex-shrink-0 pt-0.5">
-                    {isSurvey ? "Response" : "Your answer"}
-                  </span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded font-medium ${
-                      isSurvey
-                        ? "text-teal-700 bg-teal-50"
-                        : answer.isCorrect
-                        ? "text-green-700 bg-green-50"
-                        : "text-red-700 bg-red-50 line-through"
-                    }`}
-                  >
-                    {answer.value || "(no answer)"}
-                  </span>
-                </div>
-                {!isSurvey && !answer.isCorrect && (
+                <div className="ml-7 space-y-1 text-sm">
                   <div className="flex gap-2">
-                    <span className="text-gray-400 text-xs w-20 flex-shrink-0 pt-0.5">Correct</span>
-                    <span className="text-xs px-2 py-0.5 rounded font-medium text-green-700 bg-green-50">
-                      {answer.question.answer}
+                    <span className="text-gray-400 text-xs w-20 flex-shrink-0 pt-0.5">
+                      {isSurvey ? "Response" : "Your answer"}
+                    </span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded font-medium ${
+                        isSurvey
+                          ? "text-teal-700 bg-teal-50"
+                          : answer.isCorrect
+                          ? "text-green-700 bg-green-50"
+                          : "text-red-700 bg-red-50 line-through"
+                      }`}
+                    >
+                      {answer.value || "(no answer)"}
                     </span>
                   </div>
-                )}
+                  {!isSurvey && !answer.isCorrect && (
+                    <div className="flex gap-2">
+                      <span className="text-gray-400 text-xs w-20 flex-shrink-0 pt-0.5">Correct</span>
+                      <span className="text-xs px-2 py-0.5 rounded font-medium text-green-700 bg-green-50">
+                        {answer.question.answer}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
+
+      {isExam && (
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 text-center text-sm text-gray-500">
+          Detailed answers are not shown for exam mode.
+        </div>
+      )}
 
       <div className="mt-8 flex gap-3">
         <Link

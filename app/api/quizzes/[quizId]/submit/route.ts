@@ -13,6 +13,11 @@ export async function POST(request: Request, { params }: { params: { quizId: str
   })
   if (!quiz) return NextResponse.json({ error: "Quiz not found" }, { status: 404 })
 
+  // Check closeAt
+  if (quiz.closeAt && new Date() > quiz.closeAt) {
+    return NextResponse.json({ error: "This quiz is no longer accepting submissions" }, { status: 403 })
+  }
+
   const existing = await prisma.submission.findFirst({
     where: { quizId: params.quizId, studentId: session.user.id },
   })
@@ -34,10 +39,11 @@ export async function POST(request: Request, { params }: { params: { quizId: str
     let isCorrect = false
 
     if (question.type === "SURVEY") {
-      isCorrect = studentAnswer.length > 0  // any non-empty response is "correct"
-    } else if (question.type === "MULTIPLE_CHOICE") {
+      isCorrect = studentAnswer.length > 0
+    } else if (question.type === "MULTIPLE_CHOICE" || question.type === "TRUE_FALSE") {
       isCorrect = studentAnswer === question.answer
     } else {
+      // SHORT_ANSWER and FILL_BLANK: case-insensitive
       isCorrect = studentAnswer.toLowerCase() === question.answer.toLowerCase()
     }
 
@@ -48,6 +54,11 @@ export async function POST(request: Request, { params }: { params: { quizId: str
   })
 
   const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0
+
+  // Compute pass/fail for EXAM mode
+  const passed = quiz.mode === "EXAM"
+    ? score >= (quiz.passingScore ?? 60)
+    : null
 
   const submission = await prisma.submission.create({
     data: {
@@ -60,5 +71,5 @@ export async function POST(request: Request, { params }: { params: { quizId: str
     },
   })
 
-  return NextResponse.json({ submissionId: submission.id, score }, { status: 201 })
+  return NextResponse.json({ submissionId: submission.id, score, passed }, { status: 201 })
 }

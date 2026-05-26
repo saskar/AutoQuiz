@@ -14,7 +14,9 @@ export async function GET(request: Request) {
   if (mine) {
     const submissions = await prisma.submission.findMany({
       where: { studentId: session.user.id },
-      include: { quiz: { select: { id: true, title: true } } },
+      include: {
+        quiz: { select: { id: true, title: true, mode: true, passingScore: true, examType: true } },
+      },
       orderBy: { submittedAt: "desc" },
     })
     return NextResponse.json(submissions)

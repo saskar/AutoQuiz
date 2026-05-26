@@ -17,7 +17,7 @@ export async function GET(
         include: { question: true },
         orderBy: { question: { order: "asc" } },
       },
-      quiz: { select: { id: true, title: true, instructorId: true } },
+      quiz: { select: { id: true, title: true, instructorId: true, mode: true, passingScore: true } },
       student: { select: { name: true, image: true } },
     },
   })

@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = await request.json()
-  const { title, description, examType, timeLimit, questions, published } = body
+  const { title, description, examType, mode, passingScore, closeAt, timeLimit, questions, published } = body
 
   if (!title?.trim()) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 })
@@ -49,6 +49,9 @@ export async function POST(request: Request) {
       title: title.trim(),
       description: description?.trim() || null,
       examType: examType ?? "QUIZ",
+      mode: mode ?? "QUIZ",
+      passingScore: passingScore ? Number(passingScore) : null,
+      closeAt: closeAt ? new Date(closeAt) : null,
       timeLimit: timeLimit ? Number(timeLimit) : null,
       published: published ?? false,
       instructorId: session.user.id,
