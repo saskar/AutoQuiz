@@ -62,6 +62,7 @@ model Quiz {
   passingScore Int?
   closeAt      DateTime?
   timeLimit    Int?
+  passage      String?
   published    Boolean      @default(false)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt

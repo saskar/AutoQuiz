@@ -20,6 +20,7 @@ export interface QuizSaveData {
   passingScore: number | null
   closeAt: string | null
   timeLimit: number | null
+  passage: string
   questions: QuestionForm[]
   published: boolean
 }
@@ -32,6 +33,7 @@ interface QuizEditorProps {
   initialPassingScore?: number | null
   initialCloseAt?: string | null
   initialTimeLimit?: number | null
+  initialPassage?: string
   initialPublished?: boolean
   initialQuestions?: QuestionForm[]
   onSave: (data: QuizSaveData) => Promise<void>
@@ -202,6 +204,7 @@ export function QuizEditor({
   initialPassingScore = null,
   initialCloseAt = null,
   initialTimeLimit = null,
+  initialPassage = "",
   initialPublished = false,
   initialQuestions,
   onSave,
@@ -219,6 +222,7 @@ export function QuizEditor({
   const [timeLimit, setTimeLimit] = useState<string>(
     initialTimeLimit ? String(initialTimeLimit) : ""
   )
+  const [passage, setPassage] = useState(initialPassage)
   const [published, setPublished] = useState(initialPublished)
   const [questions, setQuestions] = useState<QuestionForm[]>(
     initialQuestions?.length ? initialQuestions : [emptyQuestion()]
@@ -271,17 +275,19 @@ export function QuizEditor({
       passingScore: mode === "EXAM" && passingScore ? Number(passingScore) : null,
       closeAt: timeInputToISO(closeAtTime),
       timeLimit: timeLimit ? Number(timeLimit) : null,
+      passage,
       questions,
       published: pub,
     })
   }
 
-  const addGeneratedQuestions = (generated: QuestionForm[], replace: boolean) => {
+  const addGeneratedQuestions = (generated: QuestionForm[], replace: boolean, generatedPassage?: string) => {
     if (replace) {
       setQuestions(generated)
     } else {
       setQuestions((qs) => [...qs, ...generated])
     }
+    if (generatedPassage) setPassage(generatedPassage)
     setShowAI(false)
   }
 
@@ -392,6 +398,22 @@ export function QuizEditor({
               rows={2}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reading Passage <span className="text-gray-400 font-normal">(optional — for reading comprehension)</span>
+            </label>
+            <textarea
+              value={passage}
+              onChange={(e) => setPassage(e.target.value)}
+              placeholder="Paste or type a reading passage here. Students will see this alongside the questions in a split view…"
+              rows={5}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+            />
+            {passage.trim() && (
+              <p className="text-xs text-indigo-600 mt-1">✓ Split-view layout will be shown to students</p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -581,7 +603,7 @@ interface AIGeneratorModalProps {
   examType: string
   mode: string
   currentCount: number
-  onAdd: (questions: QuestionForm[], replace: boolean) => void
+  onAdd: (questions: QuestionForm[], replace: boolean, passage?: string) => void
   onClose: () => void
 }
 
@@ -593,6 +615,7 @@ function AIGeneratorModal({ examType, mode, currentCount, onAdd, onClose }: AIGe
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState("")
   const [preview, setPreview] = useState<QuestionForm[] | null>(null)
+  const [previewPassage, setPreviewPassage] = useState<string | null>(null)
 
   const isCustom = selectedSubject === "__custom__"
   const effectiveTopic = isCustom ? customTopic : selectedSubject
@@ -605,6 +628,7 @@ function AIGeneratorModal({ examType, mode, currentCount, onAdd, onClose }: AIGe
     setGenerating(true)
     setGenError("")
     setPreview(null)
+    setPreviewPassage(null)
 
     try {
       const res = await fetch("/api/ai/generate", {
@@ -625,6 +649,7 @@ function AIGeneratorModal({ examType, mode, currentCount, onAdd, onClose }: AIGe
         return
       }
       setPreview(json.questions)
+      if (json.passage) setPreviewPassage(json.passage)
     } catch {
       setGenError("Network error — please try again")
     } finally {
@@ -766,18 +791,25 @@ function AIGeneratorModal({ examType, mode, currentCount, onAdd, onClose }: AIGe
             <div className="space-y-3 mt-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-gray-700">
-                  Generated {preview.length} questions — review and add them:
+                  Generated {preview.length} questions{previewPassage ? " + reading passage" : ""} — review and add them:
                 </p>
                 <button
                   type="button"
-                  onClick={() => setPreview(null)}
+                  onClick={() => { setPreview(null); setPreviewPassage(null) }}
                   className="text-xs text-gray-500 hover:text-gray-700"
                 >
                   ← Back
                 </button>
               </div>
 
-              <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+              {previewPassage && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 max-h-32 overflow-y-auto">
+                  <p className="text-xs font-semibold text-blue-700 mb-1">📖 Reading Passage</p>
+                  <p className="text-xs text-blue-900 whitespace-pre-line leading-relaxed">{previewPassage.slice(0, 300)}…</p>
+                </div>
+              )}
+
+              <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
                 {preview.map((q, i) => (
                   <div key={i} className="bg-gray-50 rounded-lg border border-gray-200 px-4 py-3">
                     <div className="flex items-start justify-between gap-2">
@@ -795,7 +827,7 @@ function AIGeneratorModal({ examType, mode, currentCount, onAdd, onClose }: AIGe
                 {currentCount > 0 && (
                   <button
                     type="button"
-                    onClick={() => onAdd(preview, false)}
+                    onClick={() => onAdd(preview, false, previewPassage ?? undefined)}
                     className="flex-1 py-2.5 border border-indigo-300 text-indigo-700 rounded-xl text-sm font-medium hover:bg-indigo-50 transition-colors"
                   >
                     + Add to existing
@@ -803,7 +835,7 @@ function AIGeneratorModal({ examType, mode, currentCount, onAdd, onClose }: AIGe
                 )}
                 <button
                   type="button"
-                  onClick={() => onAdd(preview, true)}
+                  onClick={() => onAdd(preview, true, previewPassage ?? undefined)}
                   className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
                 >
                   {currentCount > 0 ? "Replace all" : "Use these questions"}

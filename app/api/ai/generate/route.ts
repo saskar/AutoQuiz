@@ -18,6 +18,16 @@ const EXAM_TYPE_LABELS: Record<string, string> = {
   REVIEW: "review test",
 }
 
+const READING_COMP_KEYWORDS = [
+  "reading comprehension", "reading comp", "فهم القرائي", "فهم قرائي",
+  "arabic reading", "english reading", "reading passage", "comprehension",
+]
+
+function isReadingComprehension(topic: string): boolean {
+  const lower = topic.toLowerCase()
+  return READING_COMP_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))
+}
+
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -39,6 +49,7 @@ export async function POST(request: Request) {
 
   const count = Math.min(Math.max(Number(questionCount) || 10, 1), 50)
   const examLabel = EXAM_TYPE_LABELS[examType] ?? "quiz"
+  const readingComp = isReadingComprehension(topic)
 
   const typeInstruction =
     questionTypes === "SHORT_ANSWER"
@@ -48,15 +59,48 @@ export async function POST(request: Request) {
       : `Use a natural mix: roughly 70% MULTIPLE_CHOICE and 30% SHORT_ANSWER.`
 
   const difficultyHint =
-    difficulty === "easy"
+    difficulty === "beginner" || difficulty === "easy"
       ? "Use straightforward recall and comprehension questions."
-      : difficulty === "hard"
+      : difficulty === "hard" || difficulty === "advanced" || difficulty === "expert"
       ? "Use advanced analysis, synthesis, and critical thinking questions."
       : "Balance recall with application and analysis questions."
 
   const systemPrompt = `You are an expert educator and exam writer. You create clear, well-structured exam questions following best practices. You always respond with valid JSON only — no markdown fences, no extra text.`
 
-  const userPrompt = `Create ${count} ${difficulty} questions for a ${examLabel} about: "${topic}"${subject ? ` (subject: ${subject})` : ""}
+  let userPrompt: string
+
+  if (readingComp) {
+    const isArabic = topic.toLowerCase().includes("arabic") || topic.includes("عربي") || topic.includes("قرائي")
+    userPrompt = `Create a reading comprehension ${examLabel} about "${topic}" for ${gradeLevel} students at ${difficulty} level.
+
+${isArabic ? "Write the passage in Arabic. Write questions in Arabic." : "Write the passage in English."}
+
+You must return a JSON object (NOT an array) with exactly this structure:
+{
+  "passage": "A rich, engaging passage of at least 4 paragraphs (minimum 400 words). Use \\n\\n between paragraphs. The passage should be informative and age-appropriate.",
+  "questions": [
+    {
+      "text": "Question about the passage",
+      "type": "MULTIPLE_CHOICE",
+      "options": ["A", "B", "C", "D"],
+      "answer": "exact matching option",
+      "points": 1
+    }
+  ]
+}
+
+Generate exactly ${count} questions based on the passage.
+${typeInstruction}
+${difficultyHint}
+
+Rules:
+- The passage must be at least 4 paragraphs, rich in detail
+- All questions must be answerable from the passage text
+- Multiple choice: exactly 4 options, answer must exactly match one option
+- Short answer: options must be []
+- Return only the JSON object, no extra text`
+  } else {
+    userPrompt = `Create ${count} ${difficulty} questions for a ${examLabel} about: "${topic}"${subject ? ` (subject: ${subject})` : ""}
 Target audience: ${gradeLevel}
 
 ${typeInstruction}
@@ -66,9 +110,9 @@ Return a JSON array only. Each item must follow this schema exactly:
 {
   "text": "Full question text",
   "type": "MULTIPLE_CHOICE" | "SHORT_ANSWER",
-  "options": ["A", "B", "C", "D"],  // empty [] for SHORT_ANSWER
-  "answer": "exact correct answer",  // must match one option for MC
-  "points": 1  // integer 1-5 reflecting difficulty
+  "options": ["A", "B", "C", "D"],
+  "answer": "exact correct answer",
+  "points": 1
 }
 
 Important rules:
@@ -77,6 +121,7 @@ Important rules:
 - All questions must be factually accurate and unambiguous
 - Vary question styles (define, explain, calculate, compare, identify, etc.)
 - Return only the JSON array, starting with [ and ending with ]`
+  }
 
   const message = await client.messages.create({
     model: "claude-opus-4-7",
@@ -87,30 +132,58 @@ Important rules:
 
   const raw = message.content[0].type === "text" ? message.content[0].text.trim() : ""
 
-  // Extract JSON array from response
-  const start = raw.indexOf("[")
-  const end = raw.lastIndexOf("]")
-  if (start === -1 || end === -1) {
-    return NextResponse.json({ error: "AI returned invalid format" }, { status: 500 })
+  if (readingComp) {
+    // Parse as object with passage + questions
+    const start = raw.indexOf("{")
+    const end = raw.lastIndexOf("}")
+    if (start === -1 || end === -1) {
+      return NextResponse.json({ error: "AI returned invalid format" }, { status: 500 })
+    }
+    let parsed: { passage?: string; questions?: unknown[] }
+    try {
+      parsed = JSON.parse(raw.slice(start, end + 1))
+    } catch {
+      return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 })
+    }
+
+    const passage = typeof parsed.passage === "string" ? parsed.passage.trim() : ""
+    const questions = Array.isArray(parsed.questions) ? parsed.questions : []
+
+    const valid = questions
+      .filter((q: any) => q.text && q.type && q.answer)
+      .map((q: any) => ({
+        text: String(q.text),
+        type: q.type === "SHORT_ANSWER" ? "SHORT_ANSWER" : "MULTIPLE_CHOICE",
+        options: Array.isArray(q.options) ? q.options.map(String) : [],
+        answer: String(q.answer),
+        points: Math.min(Math.max(Number(q.points) || 1, 1), 5),
+      }))
+
+    return NextResponse.json({ passage, questions: valid, count: valid.length })
+  } else {
+    // Parse as plain array
+    const start = raw.indexOf("[")
+    const end = raw.lastIndexOf("]")
+    if (start === -1 || end === -1) {
+      return NextResponse.json({ error: "AI returned invalid format" }, { status: 500 })
+    }
+    let questions: unknown[]
+    try {
+      questions = JSON.parse(raw.slice(start, end + 1))
+    } catch {
+      return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 })
+    }
+
+    const valid = questions
+      .filter((q: any) => q.text && q.type && q.answer)
+      .map((q: any) => ({
+        text: String(q.text),
+        type: q.type === "SHORT_ANSWER" ? "SHORT_ANSWER" : "MULTIPLE_CHOICE",
+        options: Array.isArray(q.options) ? q.options.map(String) : [],
+        answer: String(q.answer),
+        points: Math.min(Math.max(Number(q.points) || 1, 1), 5),
+      }))
+
+    return NextResponse.json({ questions: valid, count: valid.length })
   }
-
-  let questions: unknown[]
-  try {
-    questions = JSON.parse(raw.slice(start, end + 1))
-  } catch {
-    return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 })
-  }
-
-  // Validate and sanitize
-  const valid = questions
-    .filter((q: any) => q.text && q.type && q.answer)
-    .map((q: any) => ({
-      text: String(q.text),
-      type: q.type === "SHORT_ANSWER" ? "SHORT_ANSWER" : "MULTIPLE_CHOICE",
-      options: Array.isArray(q.options) ? q.options.map(String) : [],
-      answer: String(q.answer),
-      points: Math.min(Math.max(Number(q.points) || 1, 1), 5),
-    }))
-
-  return NextResponse.json({ questions: valid, count: valid.length })
 }

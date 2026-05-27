@@ -15,6 +15,7 @@ interface QuizData {
   passingScore: number | null
   closeAt: string | null
   timeLimit: number | null
+  passage: string | null
   published: boolean
   questions: Array<{
     id: string
@@ -146,6 +147,7 @@ export default function EditQuizPage({ params }: { params: { quizId: string } })
         initialPassingScore={quiz.passingScore}
         initialCloseAt={quiz.closeAt}
         initialTimeLimit={quiz.timeLimit}
+        initialPassage={quiz.passage ?? ""}
         initialPublished={quiz.published}
         initialQuestions={initialQuestions}
         onSave={handleSave}
