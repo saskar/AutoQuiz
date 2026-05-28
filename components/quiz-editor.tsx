@@ -1038,10 +1038,13 @@ function QuestionCard({ index, question, total, onChange, onRemove, onMove, onDu
           <textarea
             value={question.text}
             onChange={(e) => onChange({ text: e.target.value })}
-            placeholder={question.type === "FILL_BLANK" ? `Question ${index + 1} text… (use ___ for the blank)` : `Question ${index + 1} text…`}
+            placeholder={question.type === "FILL_BLANK" ? `Question ${index + 1} text… (use ___ for the blank)` : `Question ${index + 1} text… (use {name} to address the student)`}
             rows={2}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
           />
+          {question.text.includes("{name}") && (
+            <p className="text-xs text-violet-600 -mt-1">✓ Will show the student's name here</p>
+          )}
 
           {question.type === "FILL_BLANK" && (
             <div className="bg-orange-50 border border-orange-100 rounded-lg px-3 py-2 text-xs text-orange-700">

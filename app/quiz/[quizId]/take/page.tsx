@@ -249,7 +249,7 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
                   {isSurvey && <span className="text-xs text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded font-medium mr-2">Opinion</span>}
                   {isTrueFalse && <span className="text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium mr-2">True/False</span>}
                   {isFillBlank && <span className="text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded font-medium mr-2">Fill in the Blank</span>}
-                  <span className="text-sm font-medium text-gray-800">{question.text}</span>
+                  <span className="text-sm font-medium text-gray-800">{question.text.replace(/\{name\}/gi, studentName || "{name}")}</span>
                 </div>
               </div>
               <span className="text-xs text-gray-400 flex-shrink-0 ml-3">{question.points}pt{question.points !== 1 ? "s" : ""}</span>
