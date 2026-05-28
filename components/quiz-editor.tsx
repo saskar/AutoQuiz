@@ -21,6 +21,8 @@ export interface QuizSaveData {
   closeAt: string | null
   timeLimit: number | null
   passage: string
+  collectName: boolean
+  namePrompt: string
   questions: QuestionForm[]
   published: boolean
 }
@@ -34,6 +36,8 @@ interface QuizEditorProps {
   initialCloseAt?: string | null
   initialTimeLimit?: number | null
   initialPassage?: string
+  initialCollectName?: boolean
+  initialNamePrompt?: string
   initialPublished?: boolean
   initialQuestions?: QuestionForm[]
   onSave: (data: QuizSaveData) => Promise<void>
@@ -205,6 +209,8 @@ export function QuizEditor({
   initialCloseAt = null,
   initialTimeLimit = null,
   initialPassage = "",
+  initialCollectName = false,
+  initialNamePrompt = "",
   initialPublished = false,
   initialQuestions,
   onSave,
@@ -223,6 +229,8 @@ export function QuizEditor({
     initialTimeLimit ? String(initialTimeLimit) : ""
   )
   const [passage, setPassage] = useState(initialPassage)
+  const [collectName, setCollectName] = useState(initialCollectName)
+  const [namePrompt, setNamePrompt] = useState(initialNamePrompt)
   const [published, setPublished] = useState(initialPublished)
   const [questions, setQuestions] = useState<QuestionForm[]>(
     initialQuestions?.length ? initialQuestions : [emptyQuestion()]
@@ -276,6 +284,8 @@ export function QuizEditor({
       closeAt: timeInputToISO(closeAtTime),
       timeLimit: timeLimit ? Number(timeLimit) : null,
       passage,
+      collectName,
+      namePrompt,
       questions,
       published: pub,
     })
@@ -480,23 +490,69 @@ export function QuizEditor({
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setPublished((p) => !p)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                published ? "bg-indigo-600" : "bg-gray-200"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                  published ? "translate-x-6" : "translate-x-1"
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPublished((p) => !p)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  published ? "bg-indigo-600" : "bg-gray-200"
                 }`}
-              />
-            </button>
-            <span className="text-sm text-gray-700">
-              {published ? "Published" : "Draft"} · Total: <strong>{totalPoints} pts</strong>
-            </span>
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    published ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+              <span className="text-sm text-gray-700">
+                {published ? "Published" : "Draft"} · Total: <strong>{totalPoints} pts</strong>
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCollectName((c) => !c)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 mt-0.5 ${
+                    collectName ? "bg-violet-600" : "bg-gray-200"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      collectName ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+                <div>
+                  <p className="text-sm text-gray-700 font-medium">Address students by name</p>
+                  <p className="text-xs text-gray-400">
+                    {collectName
+                      ? "Students will be greeted by name throughout the quiz"
+                      : "Ask for the student's name and personalise the experience"}
+                  </p>
+                </div>
+              </div>
+
+              {collectName && (
+                <div className="ml-14 space-y-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Welcome message <span className="text-gray-400 font-normal">(use {"{name}"} to insert their name)</span></label>
+                    <input
+                      type="text"
+                      value={namePrompt}
+                      onChange={(e) => setNamePrompt(e.target.value)}
+                      placeholder={`Welcome, {name}! Good luck on your ${mode === "EXAM" ? "exam" : "quiz"}.`}
+                      className="w-full border border-violet-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                    />
+                  </div>
+                  <p className="text-xs text-violet-600 bg-violet-50 rounded-lg px-3 py-2">
+                    Preview: <em>{(namePrompt || `Welcome, {name}! Good luck on your ${mode === "EXAM" ? "exam" : "quiz"}.`).replace("{name}", "Ahmed")}</em>
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

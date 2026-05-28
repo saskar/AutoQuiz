@@ -26,6 +26,8 @@ interface Quiz {
   closeAt: string | null
   timeLimit: number | null
   passage: string | null
+  collectName: boolean
+  namePrompt: string | null
   questions: Question[]
   instructor: { name: string | null }
 }
@@ -41,6 +43,9 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
   const [error, setError] = useState("")
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const [closed, setClosed] = useState(false)
+  const [studentName, setStudentName] = useState("")
+  const [nameInput, setNameInput] = useState("")
+  const [nameReady, setNameReady] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -71,7 +76,8 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
         }
         return
       }
-      router.push(`/quiz/${params.quizId}/result?submissionId=${json.submissionId}`)
+      const nameParam = studentName ? `&name=${encodeURIComponent(studentName)}` : ""
+      router.push(`/quiz/${params.quizId}/result?submissionId=${json.submissionId}${nameParam}`)
     } finally {
       setSubmitting(false)
     }
@@ -149,6 +155,52 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
   }
 
   if (!quiz) return null
+
+  // Name capture screen
+  if (quiz.collectName && !nameReady) {
+    const welcomeTemplate = quiz.namePrompt || `Welcome! Good luck on your ${quiz.mode === "EXAM" ? "exam" : "quiz"}.`
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8 w-full max-w-md text-center">
+          <div className="text-4xl mb-4">👋</div>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">{quiz.title}</h1>
+          <p className="text-sm text-gray-500 mb-6">By {quiz.instructor.name}</p>
+          <p className="text-sm font-medium text-gray-700 mb-4">What is your name?</p>
+          <input
+            type="text"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && nameInput.trim()) {
+                setStudentName(nameInput.trim())
+                setNameReady(true)
+              }
+            }}
+            placeholder="Enter your name…"
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 text-center text-base mb-4"
+            autoFocus
+          />
+          <button
+            onClick={() => {
+              if (nameInput.trim()) {
+                setStudentName(nameInput.trim())
+                setNameReady(true)
+              }
+            }}
+            disabled={!nameInput.trim()}
+            className="w-full bg-violet-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-violet-700 disabled:opacity-40 transition-colors"
+          >
+            Start {quiz.mode === "EXAM" ? "Exam" : "Quiz"} →
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Welcome banner shown after name entry (first render of quiz)
+  const welcomeMessage = quiz.collectName && studentName
+    ? (quiz.namePrompt || `Welcome! Good luck on your ${quiz.mode === "EXAM" ? "exam" : "quiz"}.`).replace("{name}", studentName)
+    : null
 
   const answered = Object.values(answers).filter((v) => v.trim()).length
   const total = quiz.questions.length
@@ -273,6 +325,11 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
         {examMeta && <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">{examMeta.emoji} {examMeta.label}</span>}
         {isExam && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">Exam · Pass: {quiz.passingScore ?? 60}%</span>}
       </div>
+      {welcomeMessage && (
+        <div className="mb-3 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 text-sm text-violet-800 font-medium">
+          {welcomeMessage}
+        </div>
+      )}
       <h1 className="text-2xl font-bold text-gray-900">{quiz.title}</h1>
       {quiz.description && <p className="text-gray-500 text-sm mt-1">{quiz.description}</p>}
       <div className="flex gap-4 text-xs text-gray-400 mt-2">
@@ -313,7 +370,7 @@ export default function TakeQuizPage({ params }: { params: { quizId: string } })
                 )}
               </div>
             </div>
-            <h1 className="text-lg font-bold text-gray-900">{quiz.title}</h1>
+            <h1 className="text-lg font-bold text-gray-900">{welcomeMessage ? `${welcomeMessage} — ` : ""}{quiz.title}</h1>
             <div className="flex items-center gap-4 mt-1">
               <div className="flex gap-3 text-xs text-gray-400">
                 <span>{total} questions · {totalPoints} pts</span>

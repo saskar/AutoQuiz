@@ -63,6 +63,8 @@ model Quiz {
   closeAt      DateTime?
   timeLimit    Int?
   passage      String?
+  collectName  Boolean      @default(false)
+  namePrompt   String?
   published    Boolean      @default(false)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt

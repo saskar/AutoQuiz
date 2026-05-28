@@ -42,7 +42,7 @@ export async function PUT(request: Request, { params }: { params: { quizId: stri
   }
 
   const body = await request.json()
-  const { title, description, examType, mode, passingScore, closeAt, timeLimit, passage, questions, published } = body
+  const { title, description, examType, mode, passingScore, closeAt, timeLimit, passage, collectName, namePrompt, questions, published } = body
 
   await prisma.question.deleteMany({ where: { quizId: params.quizId } })
 
@@ -57,6 +57,8 @@ export async function PUT(request: Request, { params }: { params: { quizId: stri
       closeAt: closeAt ? new Date(closeAt) : null,
       timeLimit: timeLimit ? Number(timeLimit) : null,
       passage: passage?.trim() || null,
+      collectName: collectName ?? quiz.collectName,
+      namePrompt: namePrompt?.trim() || null,
       published: published ?? quiz.published,
       questions: {
         create: questions.map((q: any, index: number) => ({

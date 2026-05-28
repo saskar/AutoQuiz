@@ -60,6 +60,7 @@ export default function ResultPage({ params }: { params: { quizId: string } }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const submissionId = searchParams.get("submissionId")
+  const studentName = searchParams.get("name") ?? ""
 
   const [submission, setSubmission] = useState<Submission | null>(null)
   const [loading, setLoading] = useState(true)
@@ -104,6 +105,16 @@ export default function ResultPage({ params }: { params: { quizId: string } }) {
       <Link href="/dashboard" className="text-sm text-gray-400 hover:text-gray-600 mb-6 inline-block">
         ← Dashboard
       </Link>
+
+      {studentName && (
+        <div className="mb-4 bg-violet-50 border border-violet-200 rounded-xl px-5 py-3 text-sm text-violet-800 font-medium">
+          {submission.score >= 70
+            ? `Great work, ${studentName}! 🎉`
+            : submission.score >= 50
+            ? `Good effort, ${studentName}! Keep practising.`
+            : `Keep going, ${studentName}! You'll get there.`}
+        </div>
+      )}
 
       {/* Pass/Fail banner for EXAM mode */}
       {isExam && passed !== null && (
