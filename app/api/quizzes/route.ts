@@ -44,33 +44,44 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 })
   }
 
-  const quiz = await prisma.quiz.create({
-    data: {
-      title: title.trim(),
-      description: description?.trim() || null,
-      examType: examType ?? "QUIZ",
-      mode: mode ?? "QUIZ",
-      passingScore: passingScore ? Number(passingScore) : null,
-      closeAt: closeAt ? new Date(closeAt) : null,
-      timeLimit: timeLimit ? Number(timeLimit) : null,
-      passage: passage?.trim() || null,
-      collectName: collectName ?? false,
-      namePrompt: namePrompt?.trim() || null,
-      published: published ?? false,
-      instructorId: session.user.id,
-      questions: {
-        create: questions.map((q: any, index: number) => ({
-          text: q.text,
-          type: q.type,
-          options: q.options?.length ? JSON.stringify(q.options) : null,
-          answer: q.answer,
-          points: Number(q.points) || 1,
-          order: index,
-        })),
+  try {
+    const quiz = await prisma.quiz.create({
+      data: {
+        title: title.trim(),
+        description: description?.trim() || null,
+        examType: examType ?? "QUIZ",
+        mode: mode ?? "QUIZ",
+        passingScore: passingScore ? Number(passingScore) : null,
+        closeAt: closeAt ? new Date(closeAt) : null,
+        timeLimit: timeLimit ? Number(timeLimit) : null,
+        passage: passage?.trim() || null,
+        collectName: collectName ?? false,
+        namePrompt: namePrompt?.trim() || null,
+        published: published ?? false,
+        instructorId: session.user.id,
+        questions: {
+          create: questions.map((q: any, index: number) => ({
+            text: q.text,
+            type: q.type,
+            options: q.options?.length ? JSON.stringify(q.options) : null,
+            answer: q.answer,
+            points: Number(q.points) || 1,
+            order: index,
+          })),
+        },
       },
-    },
-    include: { questions: true },
-  })
-
-  return NextResponse.json(quiz, { status: 201 })
+      include: { questions: true },
+    })
+    return NextResponse.json(quiz, { status: 201 })
+  } catch (err: any) {
+    console.error("Quiz create error:", err)
+    const msg = err?.message ?? "Failed to save quiz"
+    if (msg.includes("passage") || msg.includes("collectName") || msg.includes("namePrompt")) {
+      return NextResponse.json(
+        { error: "Database schema is out of date. Run: npx prisma db push" },
+        { status: 500 }
+      )
+    }
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }

@@ -44,37 +44,48 @@ export async function PUT(request: Request, { params }: { params: { quizId: stri
   const body = await request.json()
   const { title, description, examType, mode, passingScore, closeAt, timeLimit, passage, collectName, namePrompt, questions, published } = body
 
-  await prisma.question.deleteMany({ where: { quizId: params.quizId } })
+  try {
+    await prisma.question.deleteMany({ where: { quizId: params.quizId } })
 
-  const updated = await prisma.quiz.update({
-    where: { id: params.quizId },
-    data: {
-      title: title.trim(),
-      description: description?.trim() || null,
-      examType: examType ?? quiz.examType,
-      mode: mode ?? quiz.mode,
-      passingScore: passingScore != null ? Number(passingScore) : null,
-      closeAt: closeAt ? new Date(closeAt) : null,
-      timeLimit: timeLimit ? Number(timeLimit) : null,
-      passage: passage?.trim() || null,
-      collectName: collectName ?? quiz.collectName,
-      namePrompt: namePrompt?.trim() || null,
-      published: published ?? quiz.published,
-      questions: {
-        create: questions.map((q: any, index: number) => ({
-          text: q.text,
-          type: q.type,
-          options: q.options?.length ? JSON.stringify(q.options) : null,
-          answer: q.answer,
-          points: Number(q.points) || 1,
-          order: index,
-        })),
+    const updated = await prisma.quiz.update({
+      where: { id: params.quizId },
+      data: {
+        title: title.trim(),
+        description: description?.trim() || null,
+        examType: examType ?? quiz.examType,
+        mode: mode ?? quiz.mode,
+        passingScore: passingScore != null ? Number(passingScore) : null,
+        closeAt: closeAt ? new Date(closeAt) : null,
+        timeLimit: timeLimit ? Number(timeLimit) : null,
+        passage: passage?.trim() || null,
+        collectName: collectName ?? quiz.collectName,
+        namePrompt: namePrompt?.trim() || null,
+        published: published ?? quiz.published,
+        questions: {
+          create: questions.map((q: any, index: number) => ({
+            text: q.text,
+            type: q.type,
+            options: q.options?.length ? JSON.stringify(q.options) : null,
+            answer: q.answer,
+            points: Number(q.points) || 1,
+            order: index,
+          })),
+        },
       },
-    },
-    include: { questions: true },
-  })
-
-  return NextResponse.json(updated)
+      include: { questions: true },
+    })
+    return NextResponse.json(updated)
+  } catch (err: any) {
+    console.error("Quiz update error:", err)
+    const msg = err?.message ?? "Failed to save quiz"
+    if (msg.includes("passage") || msg.includes("collectName") || msg.includes("namePrompt")) {
+      return NextResponse.json(
+        { error: "Database schema is out of date. Run: npx prisma db push" },
+        { status: 500 }
+      )
+    }
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }
 
 export async function DELETE(request: Request, { params }: { params: { quizId: string } }) {

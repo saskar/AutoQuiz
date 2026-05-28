@@ -71,8 +71,12 @@ export default function EditQuizPage({ params }: { params: { quizId: string } })
         body: JSON.stringify(data),
       })
       if (!res.ok) {
-        const json = await res.json()
-        setError(json.error || "Failed to save")
+        try {
+          const json = await res.json()
+          setError(json.error || "Failed to save")
+        } catch {
+          setError(`Server error (${res.status}) — make sure you ran: npx prisma db push`)
+        }
         return
       }
       const updated = await res.json()

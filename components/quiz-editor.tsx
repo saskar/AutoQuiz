@@ -625,8 +625,12 @@ export function QuizEditor({
       </button>
 
       {(error || saveError) && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-          {error || saveError}
+        <div className="bg-red-50 border-2 border-red-400 rounded-xl px-4 py-4 text-sm text-red-700 flex items-start gap-3">
+          <span className="text-lg flex-shrink-0">⚠️</span>
+          <div>
+            <p className="font-semibold mb-0.5">Could not save</p>
+            <p>{error || saveError}</p>
+          </div>
         </div>
       )}
 

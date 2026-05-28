@@ -26,8 +26,12 @@ export default function CreateQuizPage() {
         body: JSON.stringify(data),
       })
       if (!res.ok) {
-        const json = await res.json()
-        setError(json.error || "Failed to save quiz")
+        try {
+          const json = await res.json()
+          setError(json.error || "Failed to save quiz")
+        } catch {
+          setError(`Server error (${res.status}) — make sure you ran: npx prisma db push`)
+        }
         return
       }
       const quiz = await res.json()
