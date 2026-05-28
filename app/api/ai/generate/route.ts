@@ -77,7 +77,7 @@ ${isArabic ? "Write the passage in Arabic. Write questions in Arabic." : "Write 
 
 You must return a JSON object (NOT an array) with exactly this structure:
 {
-  "passage": "A rich, engaging passage of at least 4 paragraphs (minimum 400 words). Use \\n\\n between paragraphs. The passage should be informative and age-appropriate.",
+  "passage": "A well-written passage of at least 3 paragraphs (minimum 300 words). Each paragraph should be separated by \\n\\n. The passage must be rich, engaging, and appropriate for the level.",
   "questions": [
     {
       "text": "Question about the passage",
@@ -89,16 +89,16 @@ You must return a JSON object (NOT an array) with exactly this structure:
   ]
 }
 
-Generate exactly ${count} questions based on the passage.
+Generate exactly ${count} questions based solely on the passage.
 ${typeInstruction}
 ${difficultyHint}
 
-Rules:
-- The passage must be at least 4 paragraphs, rich in detail
-- All questions must be answerable from the passage text
-- Multiple choice: exactly 4 options, answer must exactly match one option
+STRICT RULES:
+- The passage MUST be at least 3 full paragraphs separated by \\n\\n — never skip this
+- Every question must be answerable directly from the passage text
+- Multiple choice: exactly 4 options, answer must exactly match one option string
 - Short answer: options must be []
-- Return only the JSON object, no extra text`
+- Return only the JSON object, no extra text, no markdown`
   } else {
     userPrompt = `Create ${count} ${difficulty} questions for a ${examLabel} about: "${topic}"${subject ? ` (subject: ${subject})` : ""}
 Target audience: ${gradeLevel}

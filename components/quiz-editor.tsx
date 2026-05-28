@@ -400,19 +400,25 @@ export function QuizEditor({
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Reading Passage <span className="text-gray-400 font-normal">(optional — for reading comprehension)</span>
-            </label>
+          <div className={`rounded-xl p-4 border ${passage.trim() ? "border-amber-300 bg-amber-50" : "border-dashed border-gray-300 bg-gray-50"}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-base">📖</span>
+              <label className="block text-sm font-semibold text-gray-700">
+                Reading Passage
+              </label>
+              <span className="text-xs text-gray-400 font-normal">(optional — enables split-view for students)</span>
+            </div>
             <textarea
               value={passage}
               onChange={(e) => setPassage(e.target.value)}
-              placeholder="Paste or type a reading passage here. Students will see this alongside the questions in a split view…"
-              rows={5}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+              placeholder="Paste or type a reading passage here (at least 2–3 paragraphs). Students will see it alongside the questions in a side-by-side view, like SABIS…"
+              rows={6}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 resize-y bg-white"
             />
-            {passage.trim() && (
-              <p className="text-xs text-indigo-600 mt-1">✓ Split-view layout will be shown to students</p>
+            {passage.trim() ? (
+              <p className="text-xs text-amber-700 mt-1.5 font-medium">✓ Split-view layout will be shown to students — passage on the left, questions on the right</p>
+            ) : (
+              <p className="text-xs text-gray-400 mt-1.5">Leave empty for a regular question-only layout. Use AI generator to auto-create a passage for reading comprehension topics.</p>
             )}
           </div>
 
