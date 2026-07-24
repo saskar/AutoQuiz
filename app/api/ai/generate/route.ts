@@ -13,7 +13,9 @@ function callAnthropic(payload: {
   messages: Array<{ role: string; content: string }>
 }): Promise<{ content: Array<{ type: string; text: string }> }> {
   return new Promise((resolve, reject) => {
-    const apiKey = (process.env.ANTHROPIC_API_KEY ?? "").trim()
+    // Strip anything outside printable ASCII (0x21-0x7E).
+    // Covers \r, \n, BOM (﻿), and any invisible chars from Windows .env files.
+    const apiKey = (process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, "")
     const body = Buffer.from(JSON.stringify(payload), "utf-8")
 
     const req = https.request(
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+  if (!(process.env.ANTHROPIC_API_KEY ?? "").replace(/[^\x21-\x7E]/g, "")) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set in your .env file" }, { status: 500 })
   }
 
