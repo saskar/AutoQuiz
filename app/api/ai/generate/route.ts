@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import * as https from "node:https"
+import * as https from "https"
 
 // Calls the Anthropic Messages API using node:https directly.
 // This bypasses Next.js's patched global fetch (which re-stringifies Buffer
@@ -80,14 +80,20 @@ function isReadingComprehension(topic: string): boolean {
 }
 
 export async function POST(request: Request) {
+  try {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set in .env" }, { status: 500 })
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set in your .env file" }, { status: 500 })
   }
 
-  const body = await request.json()
+  let body: any
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+  }
   const {
     topic,
     examType = "QUIZ",
@@ -255,5 +261,9 @@ Important rules:
       }))
 
     return NextResponse.json({ questions: valid, count: valid.length })
+  }
+  } catch (err: any) {
+    console.error("[ai/generate] unhandled error:", err)
+    return NextResponse.json({ error: `Server error: ${err?.message ?? String(err)}` }, { status: 500 })
   }
 }
