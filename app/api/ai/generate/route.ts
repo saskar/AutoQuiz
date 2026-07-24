@@ -1,20 +1,60 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import Anthropic from "@anthropic-ai/sdk"
+import * as https from "node:https"
 
-// Node.js 18 + Windows: native fetch (undici) rejects string bodies that
-// contain non-ASCII characters because it validates them as Latin-1 ByteStrings.
-// Sending the body as a Buffer bypasses that check and lets UTF-8 content
-// (Arabic text, bullet points, etc.) pass through correctly.
-const utf8Fetch: typeof fetch = (input, init) => {
-  if (init?.body && typeof init.body === "string") {
-    return fetch(input, { ...init, body: Buffer.from(init.body, "utf-8") } as RequestInit)
-  }
-  return fetch(input, init)
+// Calls the Anthropic Messages API using node:https directly.
+// This bypasses Next.js's patched global fetch (which re-stringifies Buffer
+// bodies and triggers undici's Latin-1 ByteString check on non-ASCII content).
+function callAnthropic(payload: {
+  model: string
+  max_tokens: number
+  system: string
+  messages: Array<{ role: string; content: string }>
+}): Promise<{ content: Array<{ type: string; text: string }> }> {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.ANTHROPIC_API_KEY ?? ""
+    const body = Buffer.from(JSON.stringify(payload), "utf-8")
+
+    const req = https.request(
+      {
+        hostname: "api.anthropic.com",
+        port: 443,
+        path: "/v1/messages",
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+          "content-length": body.length,
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on("data", (c: Buffer) => chunks.push(c))
+        res.on("end", () => {
+          try {
+            const text = Buffer.concat(chunks).toString("utf-8")
+            const json = JSON.parse(text)
+            const status = res.statusCode ?? 0
+            if (status >= 200 && status < 300) {
+              resolve(json)
+            } else {
+              const msg = json?.error?.message ?? `HTTP ${status}`
+              reject(Object.assign(new Error(msg), { status }))
+            }
+          } catch (e) {
+            reject(e)
+          }
+        })
+        res.on("error", reject)
+      }
+    )
+    req.on("error", reject)
+    req.write(body)
+    req.end()
+  })
 }
-
-const client = new Anthropic({ fetch: utf8Fetch as any })
 
 const EXAM_TYPE_LABELS: Record<string, string> = {
   QUIZ: "quiz",
@@ -43,6 +83,10 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set in .env" }, { status: 500 })
+  }
+
   const body = await request.json()
   const {
     topic,
@@ -67,7 +111,7 @@ export async function POST(request: Request) {
       ? "Use SHORT_ANSWER type only. Set options to empty array []."
       : questionTypes === "MULTIPLE_CHOICE"
       ? "Use MULTIPLE_CHOICE type only with exactly 4 options."
-      : `Use a natural mix: roughly 70% MULTIPLE_CHOICE and 30% SHORT_ANSWER.`
+      : "Use a natural mix: roughly 70% MULTIPLE_CHOICE and 30% SHORT_ANSWER."
 
   const difficultyHint =
     difficulty === "beginner" || difficulty === "easy"
@@ -76,12 +120,16 @@ export async function POST(request: Request) {
       ? "Use advanced analysis, synthesis, and critical thinking questions."
       : "Balance recall with application and analysis questions."
 
-  const systemPrompt = `You are an expert educator and exam writer. You create clear, well-structured exam questions following best practices. You always respond with valid JSON only — no markdown fences, no extra text.`
+  const systemPrompt =
+    "You are an expert educator and exam writer. You create clear, well-structured exam questions following best practices. You always respond with valid JSON only - no markdown fences, no extra text."
 
   let userPrompt: string
 
   if (readingComp) {
-    const isArabic = topic.toLowerCase().includes("arabic") || topic.includes("عربي") || topic.includes("قرائي")
+    const isArabic =
+      topic.toLowerCase().includes("arabic") ||
+      topic.includes("عربي") ||
+      topic.includes("قرائي")
     userPrompt = `Create a reading comprehension ${examLabel} about "${topic}" for ${gradeLevel} students at ${difficulty} level.
 
 ${isArabic ? "Write the passage in Arabic. Write questions in Arabic." : "Write the passage in English."}
@@ -105,7 +153,7 @@ ${typeInstruction}
 ${difficultyHint}
 
 STRICT RULES:
-- The passage MUST be at least 3 full paragraphs separated by \\n\\n — never skip this
+- The passage MUST be at least 3 full paragraphs separated by \\n\\n - never skip this
 - Every question must be answerable directly from the passage text
 - Multiple choice: exactly 4 options, answer must exactly match one option string
 - Short answer: options must be []
@@ -120,7 +168,7 @@ ${difficultyHint}
 Return a JSON array only. Each item must follow this schema exactly:
 {
   "text": "Full question text",
-  "type": "MULTIPLE_CHOICE" | "SHORT_ANSWER",
+  "type": "MULTIPLE_CHOICE or SHORT_ANSWER",
   "options": ["A", "B", "C", "D"],
   "answer": "exact correct answer",
   "points": 1
@@ -134,29 +182,29 @@ Important rules:
 - Return only the JSON array, starting with [ and ending with ]`
   }
 
-  let message: Awaited<ReturnType<typeof client.messages.create>>
+  let message: { content: Array<{ type: string; text: string }> }
   try {
-    message = await client.messages.create({
+    message = await callAnthropic({
       model: "claude-sonnet-4-6",
       max_tokens: 8000,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     })
   } catch (err: any) {
-    const msg = err?.message ?? String(err)
-    if (msg.includes("credit") || msg.includes("balance") || msg.includes("quota")) {
-      return NextResponse.json({ error: "AI credits exhausted. Top up your Anthropic account at console.anthropic.com" }, { status: 402 })
+    const msg: string = err?.message ?? String(err)
+    const status: number = err?.status ?? 500
+    if (status === 401 || msg.toLowerCase().includes("api key") || msg.toLowerCase().includes("auth")) {
+      return NextResponse.json({ error: "Invalid Anthropic API key. Check ANTHROPIC_API_KEY in your .env file." }, { status: 401 })
     }
-    if (msg.includes("auth") || msg.includes("API key") || msg.includes("401")) {
-      return NextResponse.json({ error: "Invalid Anthropic API key. Check your ANTHROPIC_API_KEY in .env" }, { status: 401 })
+    if (status === 429 || msg.toLowerCase().includes("credit") || msg.toLowerCase().includes("balance") || msg.toLowerCase().includes("quota")) {
+      return NextResponse.json({ error: "AI credits exhausted. Add credits at console.anthropic.com" }, { status: 429 })
     }
     return NextResponse.json({ error: `AI request failed: ${msg}` }, { status: 500 })
   }
 
-  const raw = message.content[0].type === "text" ? message.content[0].text.trim() : ""
+  const raw = message.content[0]?.type === "text" ? message.content[0].text.trim() : ""
 
   if (readingComp) {
-    // Parse as object with passage + questions
     const start = raw.indexOf("{")
     const end = raw.lastIndexOf("}")
     if (start === -1 || end === -1) {
@@ -184,7 +232,6 @@ Important rules:
 
     return NextResponse.json({ passage, questions: valid, count: valid.length })
   } else {
-    // Parse as plain array
     const start = raw.indexOf("[")
     const end = raw.lastIndexOf("]")
     if (start === -1 || end === -1) {
