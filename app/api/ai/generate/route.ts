@@ -3,7 +3,18 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
 
-const client = new Anthropic()
+// Node.js 18 + Windows: native fetch (undici) rejects string bodies that
+// contain non-ASCII characters because it validates them as Latin-1 ByteStrings.
+// Sending the body as a Buffer bypasses that check and lets UTF-8 content
+// (Arabic text, bullet points, etc.) pass through correctly.
+const utf8Fetch: typeof fetch = (input, init) => {
+  if (init?.body && typeof init.body === "string") {
+    return fetch(input, { ...init, body: Buffer.from(init.body, "utf-8") } as RequestInit)
+  }
+  return fetch(input, init)
+}
+
+const client = new Anthropic({ fetch: utf8Fetch as any })
 
 const EXAM_TYPE_LABELS: Record<string, string> = {
   QUIZ: "quiz",
@@ -123,12 +134,24 @@ Important rules:
 - Return only the JSON array, starting with [ and ending with ]`
   }
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 8000,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  })
+  let message: Awaited<ReturnType<typeof client.messages.create>>
+  try {
+    message = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 8000,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    })
+  } catch (err: any) {
+    const msg = err?.message ?? String(err)
+    if (msg.includes("credit") || msg.includes("balance") || msg.includes("quota")) {
+      return NextResponse.json({ error: "AI credits exhausted. Top up your Anthropic account at console.anthropic.com" }, { status: 402 })
+    }
+    if (msg.includes("auth") || msg.includes("API key") || msg.includes("401")) {
+      return NextResponse.json({ error: "Invalid Anthropic API key. Check your ANTHROPIC_API_KEY in .env" }, { status: 401 })
+    }
+    return NextResponse.json({ error: `AI request failed: ${msg}` }, { status: 500 })
+  }
 
   const raw = message.content[0].type === "text" ? message.content[0].text.trim() : ""
 
